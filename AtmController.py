@@ -3,20 +3,15 @@
 Created on Wed Dec 16 02:26:11 2020
 
 @author: misra
-"""
-
-import sys
-
-"""
-Note: I have kept all data as public for simplicity of implementation,
-but to protect the bank details, private property is essential
 
 Code supported for testing
+Note: The controller does not have access to Bank PIN
 """
 
 class Bank:
     def __init__(self):
         self.CustomerAccounts = {}
+        self.__AccountVerification = {}
         
     def addNewCustomerAccount(self, CustomerID = 99999999, AccNo = 99999999, Pin = 0000, AccountType = "Checking", Value = 0):
         
@@ -26,7 +21,8 @@ class Bank:
             raise ValueError('Please enter valid account information')
         else:
             AccountInfo = {AccountType.capitalize(): {"Balance": Value, "AccNo": AccNo}}
-            self.CustomerAccounts[CustomerID] = {"Pin":Pin, "AccountInfo": AccountInfo}
+            self.CustomerAccounts[CustomerID] = {"AccountInfo": AccountInfo}
+            self.__AccountVerification[CustomerID] = {"Pin":Pin}
             
     def addExistingCustomerAccount(self, CustomerID = 99999999, AccNo = 99999999, AccountType = "Checking", Value = 0):
         
@@ -41,7 +37,7 @@ class Bank:
      
     def updateAccount(self, CusID, AccountType, Value):
         if AccountType.capitalize() in self.CustomerAccounts[CusID]["AccountInfo"]:
-            self.CustomerAccounts[CusID]["AccountInfo"][AccountType.capitalize()]["Balance"] = Value
+            self.CustomerAccounts[CusID]["AccountInfo"][AccountType.capitalize()]["Balance"] += Value
             return True
         else:
             return False
@@ -62,10 +58,10 @@ class Bank:
             print("Invalid Customer ID")
     
     def verifyPin(self, CusID, PinInput):
-        if CusID in self.CustomerAccounts and self.CustomerAccounts[CusID]["Pin"] == PinInput:
-            return self.CustomerAccounts[CusID]["AccountInfo"]
+        if CusID in self.__AccountVerification and self.__AccountVerification[CusID]["Pin"] == PinInput:
+            return True
         else:
-            return None
+            return False
         
     
 
@@ -73,29 +69,37 @@ class Controller:
     def __init__(self):
         self.ValidPin = False
         
-    def cardVerify(self, CusID, Bank):
+    def cardSwipe(self, CusID, Bank):
         
         print("Enter PIN: ", end = ' ')
         Pin = int(input())
         print('\n')
         
         self.Bank = Bank
-        self.AccountInfo = Bank.verifyPin(CusID, Pin)
-        if self.AccountInfo is None:
-            print("Invalid Pin")
+        
+        IsValidPin = Bank.verifyPin(CusID, Pin)
+        if not IsValidPin:
+            print("Invalid PIN")
         else:
-            print("Select Account (Checking/Saving): ")
-            UserInput = input()
+            print("Select Account:\n1.Checking\n2.Saving")
+            UserInput = int(input())
+            while UserInput not in [1,2]:
+                print("\nPlease select a valid account:")
+                UserInput = int(input())
+                
             self.selectAccount(UserInput, CusID)
             self.ValidPin = True
             
         return self.ValidPin
         
-    def selectAccount(self, AccountType, CusID):
+    def selectAccount(self, AccountSelection, CusID):
         
-        AccountType = AccountType.capitalize()
-        
-        if AccountType in self.AccountInfo:
+        if AccountSelection == 1:
+            AccountType = "Checking"
+        elif AccountSelection == 2:
+            AccountType = "Saving"
+            
+        if AccountType in self.Bank.CustomerAccounts[CusID]["AccountInfo"]:
             print("\n1. Display\n2. Deposit\n3. Withdraw\nEnter Option: ")
             N = int(input())
             print('\n')
@@ -112,30 +116,29 @@ class Controller:
         
     def performTask(self, Option, AccountType, CusID):
         if Option == 1:
-            print(self.AccountInfo[AccountType])
+            self.Bank.displayAccount(CusID, AccountType)
             return True
         elif Option == 2:
             print("Enter amount to be deposited: ")
             Val = int(input())
             
-            NewVal = self.AccountInfo[AccountType]["Balance"] + Val
-            
-            self.Bank.updateAccount(CusID, AccountType, NewVal)
-            print("Updated Account: \n")
+            self.Bank.updateAccount(CusID, AccountType, Val)
+            print("\nUpdated {} Account:\n".format(AccountType))
             self.Bank.displayAccount(CusID, AccountType)
             return True
         else:
             print("Enter amount to be withdrawn: ")
             Val = int(input())
             
-            if Val > self.AccountInfo[AccountType]["Balance"]:
+            BankBalance = self.Bank.CustomerAccounts[CusID]["AccountInfo"][AccountType]["Balance"]
+            
+            if Val > BankBalance:
                 print("Failed to withdraw amount")
                 return False
             else:
-                NewVal = self.AccountInfo[AccountType]["Balance"] - Val
             
-                self.Bank.updateAccount(CusID, AccountType, NewVal)
-                print("Updated Account: \n")
+                self.Bank.updateAccount(CusID, AccountType, -1*Val)
+                print("\nUpdated {} Account:\n".format(AccountType))
                 self.Bank.displayAccount(CusID, AccountType)
                 return True
             
@@ -148,11 +151,14 @@ if __name__ == "__main__":
     B.addExistingCustomerAccount(10000001, 87654321, "Saving", 1500)
     B.displayAccount(10000001)
     
+    # Validating that 2 same accounts cannot exist under the same customer
     # B.addExistingCustomerAccount(10000001, 87654321, "Checking", 1500)
     
     C = Controller()
-    C.cardVerify(10000001, B)
+    C.cardSwipe(10000001, B)
     
+    # Display all information pertaining to a customer
+    # print('\n')
     # B.displayAccount(10000001)
     
     
